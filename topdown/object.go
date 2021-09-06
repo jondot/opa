@@ -5,6 +5,8 @@
 package topdown
 
 import (
+	"strings"
+
 	"github.com/open-policy-agent/opa/ast"
 	"github.com/open-policy-agent/opa/topdown/builtins"
 	"github.com/open-policy-agent/opa/types"
@@ -88,6 +90,51 @@ func builtinObjectGet(_ BuiltinContext, operands []*ast.Term, iter func(*ast.Ter
 	return iter(operands[2])
 }
 
+func builtinObjectLookup(_ BuiltinContext, operands []*ast.Term, iter func(*ast.Term) error) error {
+	object := operands[0]
+
+	// opinionated: since language-indexing is '.', key-path index is also '.'
+	parts := strings.Split(string(operands[1].Value.(ast.String)), ".")
+	for _, part := range parts {
+		if object == nil {
+			break
+		}
+
+		aPart := ast.StringTerm(part)
+		switch original := object.Value.(type) {
+		case ast.Object:
+			// plain object indexing: e.g. person.name
+			o := original.(ast.Object)
+			object = o.Get(aPart)
+
+		case *ast.Array:
+			// index support: e.g. people.0.name
+			idx, err := toIndex(original, aPart)
+			if err != nil || idx < 0 || idx > original.Len() {
+				object = nil
+				break
+			}
+			a, err := builtins.ArrayOperand(original, 1)
+			if err != nil {
+				object = nil
+				break
+			}
+			object = a.Get(ast.IntNumberTerm(idx))
+		default:
+			//we've over-indexed this one (over-reaching path)
+			object = nil
+			break
+		}
+
+	}
+
+	if object == nil {
+		return iter(operands[2])
+	} else {
+		return iter(object)
+	}
+}
+
 // getObjectKeysParam returns a set of key values
 // from a supplied ast array, object, set value
 func getObjectKeysParam(arrayOrSet ast.Value) (ast.Set, error) {
@@ -137,4 +184,5 @@ func init() {
 	RegisterBuiltinFunc(ast.ObjectRemove.Name, builtinObjectRemove)
 	RegisterBuiltinFunc(ast.ObjectFilter.Name, builtinObjectFilter)
 	RegisterBuiltinFunc(ast.ObjectGet.Name, builtinObjectGet)
+	RegisterBuiltinFunc(ast.ObjectLookup.Name, builtinObjectLookup)
 }

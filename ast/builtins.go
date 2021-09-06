@@ -153,6 +153,7 @@ var DefaultBuiltins = [...]*Builtin{
 	ObjectRemove,
 	ObjectFilter,
 	ObjectGet,
+	ObjectLookup,
 
 	// JSON Object Manipulation
 	JSONFilter,
@@ -1221,6 +1222,18 @@ var JSONPatch = &Builtin{
 // present, otherwise it returns the default.
 var ObjectGet = &Builtin{
 	Name: "object.get",
+	Decl: types.NewFunction(
+		types.Args(
+			types.NewObject(nil, types.NewDynamicProperty(types.A, types.A)),
+			types.A,
+			types.A,
+		),
+		types.A,
+	),
+}
+
+var ObjectLookup = &Builtin{
+	Name: "object.lookup",
 	Decl: types.NewFunction(
 		types.Args(
 			types.NewObject(nil, types.NewDynamicProperty(types.A, types.A)),
